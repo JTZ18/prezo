@@ -1,0 +1,2055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepStream + vLLM Automatic Data Annotation Pipeline</title>
+    <style>
+        /* HTX Brand Color Palette */
+        :root {
+            --htx-purple: #5B2D8C;
+            --htx-deep-blue: #1A237E;
+            --htx-medium-blue: #0D47A1;
+            --htx-cyan: #00BCD4;
+            --htx-light-cyan: #4DD0E1;
+            --htx-light-gray-bg: #F5F5F5;
+            --htx-white: #FFFFFF;
+            --htx-black: #1A1A1A;
+            --htx-gold: #FFD700;
+            --htx-table-header-purple: #4A2074;
+            --htx-row-alt-gray: #F0F0F0;
+            --htx-border-gray: #E0E0E0;
+            --htx-page-number-gray: #666666;
+            --htx-gradient: linear-gradient(90deg, #1A237E 0%, #0D47A1 50%, #00BCD4 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            background: var(--htx-black);
+            overflow-x: hidden;
+        }
+
+        /* Slide Container */
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .slide {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: none;
+            padding: 36px 54px;
+            overflow: hidden;
+        }
+
+        .slide.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Title Slide Styles */
+        .slide.title-slide {
+            background: var(--htx-gradient);
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+        }
+
+        .slide.title-slide h1 {
+            color: var(--htx-light-cyan);
+            font-size: 4rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .slide.title-slide h2 {
+            color: var(--htx-white);
+            font-size: 1.8rem;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            animation: fadeInUp 1s ease-out 0.3s both;
+        }
+
+        .slide.title-slide .subtitle {
+            color: rgba(255,255,255,0.8);
+            font-size: 1.2rem;
+            margin-top: 2rem;
+            animation: fadeInUp 1s ease-out 0.5s both;
+        }
+
+        /* Content Slide Styles */
+        .slide.content-slide {
+            background: var(--htx-light-gray-bg);
+        }
+
+        .slide.content-slide h2 {
+            color: var(--htx-purple);
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+        }
+
+        .slide.content-slide .content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Section Divider Slides */
+        .slide.section-slide {
+            background: var(--htx-gradient);
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .slide.section-slide h2 {
+            color: var(--htx-light-cyan);
+            font-size: 3.5rem;
+            font-weight: bold;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .slide.section-slide .section-number {
+            color: var(--htx-white);
+            font-size: 6rem;
+            font-weight: bold;
+            opacity: 0.3;
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* Circuit Pattern */
+        .circuit-pattern {
+            position: absolute;
+            pointer-events: none;
+            opacity: 0.15;
+        }
+
+        .circuit-pattern.top-left {
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 300px;
+        }
+
+        .circuit-pattern.bottom-right {
+            bottom: 0;
+            right: 0;
+            width: 300px;
+            height: 300px;
+            transform: rotate(180deg);
+        }
+
+        .circuit-pattern svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .dark-circuit {
+            opacity: 0.25;
+        }
+
+        .dark-circuit path {
+            stroke: var(--htx-cyan);
+        }
+
+        /* HTX Logo */
+        .htx-logo {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .htx-logo svg {
+            width: 80px;
+            height: 60px;
+        }
+
+        /* Page Number */
+        .page-number {
+            position: absolute;
+            bottom: 20px;
+            right: 30px;
+            color: var(--htx-page-number-gray);
+            font-size: 14px;
+        }
+
+        /* Flow Diagram Styles */
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            flex-wrap: wrap;
+            padding: 2rem 0;
+        }
+
+        .flow-box {
+            background: var(--htx-white);
+            border: 3px solid var(--htx-purple);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            text-align: center;
+            min-width: 180px;
+            box-shadow: 0 4px 15px rgba(91, 45, 140, 0.15);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .flow-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(91, 45, 140, 0.25);
+        }
+
+        .flow-box h4 {
+            color: var(--htx-purple);
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 0.3rem;
+        }
+
+        .flow-box p {
+            color: var(--htx-black);
+            font-size: 0.85rem;
+        }
+
+        .flow-arrow {
+            font-size: 2rem;
+            color: var(--htx-purple);
+            margin: 0 0.5rem;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: var(--htx-white);
+            border-left: 5px solid var(--htx-cyan);
+            padding: 1.5rem;
+            border-radius: 0 12px 12px 0;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: scale(1.03);
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--htx-purple);
+        }
+
+        .stat-card .label {
+            color: var(--htx-page-number-gray);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Tables */
+        .styled-table {
+            width: 100%;
+            border-collapse: collapse;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .styled-table thead {
+            background: var(--htx-table-header-purple);
+        }
+
+        .styled-table th {
+            color: var(--htx-white);
+            font-weight: bold;
+            padding: 1rem;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        .styled-table td {
+            padding: 0.9rem 1rem;
+            color: var(--htx-black);
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--htx-border-gray);
+        }
+
+        .styled-table tbody tr:nth-child(odd) {
+            background: var(--htx-white);
+        }
+
+        .styled-table tbody tr:nth-child(even) {
+            background: var(--htx-row-alt-gray);
+        }
+
+        .styled-table tbody tr:hover {
+            background: rgba(91, 45, 140, 0.05);
+        }
+
+        /* Bullet Lists */
+        .bullet-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .bullet-list li {
+            position: relative;
+            padding-left: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--htx-black);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .bullet-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.5rem;
+            width: 8px;
+            height: 8px;
+            background: var(--htx-purple);
+            border-radius: 50%;
+        }
+
+        .bullet-list.cyan li::before {
+            background: var(--htx-cyan);
+        }
+
+        /* Two Column Layout */
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+
+        /* Model Cards */
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .model-card {
+            background: linear-gradient(135deg, var(--htx-white) 0%, var(--htx-row-alt-gray) 100%);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border-top: 4px solid var(--htx-purple);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s;
+        }
+
+        .model-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .model-card h4 {
+            color: var(--htx-purple);
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .model-card .model-name {
+            color: var(--htx-cyan);
+            font-weight: bold;
+            font-size: 0.95rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .model-card ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .model-card li {
+            font-size: 0.85rem;
+            color: var(--htx-page-number-gray);
+            padding: 0.2rem 0;
+        }
+
+        /* Pipeline Stage Card */
+        .stage-card {
+            background: var(--htx-white);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border-left: 6px solid var(--htx-purple);
+        }
+
+        .stage-card.cyan-border {
+            border-left-color: var(--htx-cyan);
+        }
+
+        .stage-card h3 {
+            color: var(--htx-purple);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .stage-card h3 .stage-num {
+            display: inline-block;
+            background: var(--htx-purple);
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 35px;
+            margin-right: 0.5rem;
+            font-size: 1rem;
+        }
+
+        /* Architecture Diagram */
+        .architecture-diagram {
+            background: var(--htx-white);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+        }
+
+        .gstreamer-pipeline {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 1.5rem;
+            border-radius: 10px;
+        }
+
+        .pipeline-element {
+            background: rgba(0, 188, 212, 0.2);
+            border: 1px solid var(--htx-cyan);
+            color: var(--htx-light-cyan);
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+            font-size: 0.85rem;
+        }
+
+        .pipeline-arrow {
+            color: var(--htx-cyan);
+            font-size: 1.2rem;
+        }
+
+        /* Highlight Box */
+        .highlight-box {
+            background: linear-gradient(135deg, rgba(91,45,140,0.1) 0%, rgba(0,188,212,0.1) 100%);
+            border: 2px solid var(--htx-purple);
+            border-radius: 15px;
+            padding: 1.5rem 2rem;
+            margin: 1rem 0;
+        }
+
+        .highlight-box h4 {
+            color: var(--htx-purple);
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .highlight-box p {
+            color: var(--htx-black);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        /* Code Block */
+        .code-block {
+            background: #1e1e2e;
+            border-radius: 10px;
+            padding: 1.5rem;
+            font-family: 'Courier New', monospace;
+            color: #a6e3a1;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .code-block .comment {
+            color: #6c7086;
+        }
+
+        .code-block .keyword {
+            color: #cba6f7;
+        }
+
+        .code-block .string {
+            color: #f9e2af;
+        }
+
+        .code-block .number {
+            color: #fab387;
+        }
+
+        /* Metric Badge */
+        .metric-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--htx-purple);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1rem;
+            margin: 0.3rem;
+        }
+
+        .metric-badge.cyan {
+            background: var(--htx-cyan);
+            color: var(--htx-black);
+        }
+
+        /* Weight Bar */
+        .weight-bars {
+            margin: 1.5rem 0;
+        }
+
+        .weight-item {
+            margin-bottom: 1rem;
+        }
+
+        .weight-label {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.3rem;
+            font-size: 0.95rem;
+            color: var(--htx-black);
+        }
+
+        .weight-bar-bg {
+            background: var(--htx-border-gray);
+            border-radius: 10px;
+            height: 30px;
+            overflow: hidden;
+        }
+
+        .weight-bar-fill {
+            height: 100%;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 1rem;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: width 1s ease-out;
+        }
+
+        .weight-bar-fill.purple {
+            background: linear-gradient(90deg, var(--htx-purple), #7b4db0);
+        }
+
+        .weight-bar-fill.cyan {
+            background: linear-gradient(90deg, var(--htx-deep-blue), var(--htx-cyan));
+        }
+
+        /* Summary Card */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+
+        .summary-item {
+            background: var(--htx-white);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+
+        .summary-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--htx-purple), var(--htx-cyan));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .summary-text h4 {
+            color: var(--htx-purple);
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .summary-text p {
+            color: var(--htx-page-number-gray);
+            font-size: 0.9rem;
+        }
+
+        /* Navigation */
+        .nav-controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 1rem;
+            z-index: 1000;
+            background: rgba(26, 26, 26, 0.9);
+            padding: 0.8rem 1.5rem;
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-btn {
+            background: var(--htx-purple);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-family: 'Segoe UI', Arial;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .nav-btn:hover {
+            background: var(--htx-cyan);
+            color: var(--htx-black);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .slide-counter {
+            color: white;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: var(--htx-cyan);
+            transition: width 0.3s;
+            z-index: 1001;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.8s ease-out forwards;
+        }
+
+        .delay-1 { animation-delay: 0.2s; opacity: 0; }
+        .delay-2 { animation-delay: 0.4s; opacity: 0; }
+        .delay-3 { animation-delay: 0.6s; opacity: 0; }
+        .delay-4 { animation-delay: 0.8s; opacity: 0; }
+
+        /* Three Column Layout */
+        .three-column {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        /* Feature Box */
+        .feature-box {
+            background: var(--htx-white);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.3s;
+        }
+
+        .feature-box:hover {
+            transform: translateY(-5px);
+        }
+
+        .feature-box .icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-box h4 {
+            color: var(--htx-purple);
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-box p {
+            color: var(--htx-page-number-gray);
+            font-size: 0.9rem;
+        }
+
+        /* Validation Flow */
+        .validation-flow {
+            display: flex;
+            justify-content: center;
+            align-items: stretch;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .validation-box {
+            flex: 1;
+            background: var(--htx-white);
+            border-radius: 15px;
+            padding: 1.5rem;
+            border-top: 4px solid var(--htx-purple);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+
+        .validation-box.secondary {
+            border-top-color: var(--htx-cyan);
+        }
+
+        .validation-box h4 {
+            color: var(--htx-purple);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .validation-box .weight-badge {
+            background: var(--htx-purple);
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-left: auto;
+        }
+
+        .validation-box.secondary .weight-badge {
+            background: var(--htx-cyan);
+            color: var(--htx-black);
+        }
+
+        /* Threshold Indicator */
+        .threshold-scale {
+            background: var(--htx-white);
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 1rem 0;
+        }
+
+        .scale-bar {
+            height: 40px;
+            background: linear-gradient(90deg, #ef4444 0%, #f97316 30%, #22c55e 60%, #22c55e 100%);
+            border-radius: 10px;
+            position: relative;
+            margin: 2rem 0;
+        }
+
+        .scale-marker {
+            position: absolute;
+            top: -25px;
+            transform: translateX(-50%);
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--htx-black);
+        }
+
+        .scale-label {
+            position: absolute;
+            bottom: -30px;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            color: var(--htx-page-number-gray);
+            white-space: nowrap;
+        }
+
+        /* Responsive adjustments for presentation */
+        @media (max-width: 1400px) {
+            .slide.title-slide h1 {
+                font-size: 3rem;
+            }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .model-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="slide-container">
+        <!-- Slide 1: Title -->
+        <div class="slide title-slide active" data-slide="1">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+                <path d="M0 160 L90 160 L120 130 L190 130" fill="none" stroke-width="2"/>
+                <path d="M100 0 L100 50 L70 80 L70 150" fill="none" stroke-width="2"/>
+                <path d="M130 0 L130 70 L100 100 L100 170" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+                <path d="M0 160 L90 160 L120 130 L190 130" fill="none" stroke-width="2"/>
+            </svg>
+
+            <h1>Automatic Data Annotation Pipeline</h1>
+            <h2>DeepStream + vLLM Architecture</h2>
+            <p class="subtitle">Transforming Raw Video into Curated Person Attributes Datasets</p>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <circle cx="25" cy="40" r="4" fill="#FFFFFF"/>
+                    <circle cx="75" cy="40" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Slide 2: The Problem -->
+        <div class="slide content-slide" data-slide="2">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M100 0 L100 50 L70 80 L70 150" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>The Scale Challenge</h2>
+
+            <div class="content">
+                <div class="stats-grid animate-in">
+                    <div class="stat-card">
+                        <div class="number">60s</div>
+                        <div class="label">Video Duration</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">30</div>
+                        <div class="label">Frames Per Second</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">3</div>
+                        <div class="label">Tracked People</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" style="color: var(--htx-cyan);">5,400</div>
+                        <div class="label">Raw Detections</div>
+                    </div>
+                </div>
+
+                <div class="highlight-box animate-in delay-1">
+                    <h4>The Problem</h4>
+                    <p>Most detections are <strong>redundant</strong> &mdash; same person, similar angle, similar pose. Manual annotation of detailed attributes (clothing, accessories, actions) is prohibitively expensive. We need automation that's both <strong>fast AND accurate</strong>.</p>
+                </div>
+
+                <div class="highlight-box animate-in delay-2" style="border-color: var(--htx-cyan);">
+                    <h4>Our Solution</h4>
+                    <p>A multi-stage pipeline that processes video at <strong>500+ FPS</strong>, intelligently deduplicates to <strong>5 diverse crops per identity</strong>, generates forensic-quality captions, and validates through dual-layer verification.</p>
+                </div>
+            </div>
+
+            <div class="page-number">2</div>
+        </div>
+
+        <!-- Slide 3: Pipeline Overview -->
+        <div class="slide content-slide" data-slide="3">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Pipeline Architecture Overview</h2>
+
+            <div class="content">
+                <div class="flow-diagram animate-in">
+                    <div class="flow-box">
+                        <h4>Raw Video</h4>
+                        <p>Surveillance footage</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="border-color: var(--htx-cyan);">
+                        <h4>Stage 1</h4>
+                        <p>Detection & Tracking</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box">
+                        <h4>Stage 1.5</h4>
+                        <p>Deduplication</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="border-color: var(--htx-cyan);">
+                        <h4>Stage 2</h4>
+                        <p>Captioning</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box">
+                        <h4>Stage 3</h4>
+                        <p>Validation</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="border-color: var(--htx-gold); background: linear-gradient(135deg, #fff 0%, #fffde7 100%);">
+                        <h4>Dataset</h4>
+                        <p>COCO + JSONL</p>
+                    </div>
+                </div>
+
+                <div class="model-grid animate-in delay-1">
+                    <div class="model-card">
+                        <h4>Detection</h4>
+                        <div class="model-name">RF-DETR Large</div>
+                        <ul>
+                            <li>560&times;560 input resolution</li>
+                            <li>300 object proposals</li>
+                            <li>TensorRT FP16</li>
+                        </ul>
+                    </div>
+                    <div class="model-card">
+                        <h4>Tracking</h4>
+                        <div class="model-name">NvDCF + CLIP-ReID</div>
+                        <ul>
+                            <li>512-dim embeddings</li>
+                            <li>Hungarian assignment</li>
+                            <li>GPU-accelerated DCF</li>
+                        </ul>
+                    </div>
+                    <div class="model-card">
+                        <h4>Captioning</h4>
+                        <div class="model-name">Qwen3-VL-8B</div>
+                        <ul>
+                            <li>Multimodal VLM</li>
+                            <li>~26GB VRAM</li>
+                            <li>Forensic-style output</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">3</div>
+        </div>
+
+        <!-- Slide 4: Section - Stage 1 -->
+        <div class="slide section-slide" data-slide="4">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+
+            <span class="section-number">1</span>
+            <h2>Detection & Tracking</h2>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Slide 5: DeepStream Architecture -->
+        <div class="slide content-slide" data-slide="5">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>DeepStream GStreamer Pipeline</h2>
+
+            <div class="content">
+                <div class="architecture-diagram animate-in">
+                    <div class="gstreamer-pipeline">
+                        <span class="pipeline-element">filesrc</span>
+                        <span class="pipeline-arrow">&#8594;</span>
+                        <span class="pipeline-element">nvv4l2decoder</span>
+                        <span class="pipeline-arrow">&#8594;</span>
+                        <span class="pipeline-element">nvstreammux</span>
+                        <span class="pipeline-arrow">&#8594;</span>
+                        <span class="pipeline-element" style="background: rgba(91,45,140,0.3); border-color: var(--htx-light-cyan);">nvinfer (RF-DETR)</span>
+                        <span class="pipeline-arrow">&#8594;</span>
+                        <span class="pipeline-element" style="background: rgba(91,45,140,0.3); border-color: var(--htx-light-cyan);">nvtracker (NvDCF)</span>
+                        <span class="pipeline-arrow">&#8594;</span>
+                        <span class="pipeline-element">probe callback</span>
+                        <span class="pipeline-arrow">&#8594;</span>
+                        <span class="pipeline-element">output</span>
+                    </div>
+                </div>
+
+                <div class="two-column animate-in delay-1">
+                    <div class="stage-card">
+                        <h3>Key Insight</h3>
+                        <p style="font-size: 1.1rem; line-height: 1.7;">Frames flow <strong>continuously through GPU memory</strong> without expensive CPU transfers. Hardware video decoding, detection, and tracking all happen on the GPU.</p>
+                        <div style="margin-top: 1rem;">
+                            <span class="metric-badge">500+ FPS</span>
+                            <span class="metric-badge cyan">~12GB VRAM</span>
+                        </div>
+                    </div>
+
+                    <div class="stage-card cyan-border">
+                        <h3>Why RF-DETR?</h3>
+                        <ul class="bullet-list">
+                            <li>DETR-family end-to-end detection</li>
+                            <li>560&times;560 input, 300 proposals</li>
+                            <li>TensorRT FP16 optimization</li>
+                            <li>0.3 confidence threshold</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">5</div>
+        </div>
+
+        <!-- Slide 6: Tracking with CLIP-ReID -->
+        <div class="slide content-slide" data-slide="6">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Tracking with CLIP-ReID Integration</h2>
+
+            <div class="content">
+                <p style="font-size: 1.1rem; margin-bottom: 1.5rem; color: var(--htx-black);">NvDCF tracker uses a <strong>weighted combination of three signals</strong> for data association:</p>
+
+                <div class="weight-bars animate-in">
+                    <div class="weight-item">
+                        <div class="weight-label">
+                            <span><strong>CLIP-ReID Embeddings</strong> &mdash; Dominant signal for re-identification</span>
+                            <span>50%</span>
+                        </div>
+                        <div class="weight-bar-bg">
+                            <div class="weight-bar-fill purple" style="width: 50%;">50%</div>
+                        </div>
+                    </div>
+                    <div class="weight-item">
+                        <div class="weight-label">
+                            <span><strong>Mahalanobis Distance</strong> &mdash; Motion prediction via Kalman filter</span>
+                            <span>30%</span>
+                        </div>
+                        <div class="weight-bar-bg">
+                            <div class="weight-bar-fill cyan" style="width: 30%;">30%</div>
+                        </div>
+                    </div>
+                    <div class="weight-item">
+                        <div class="weight-label">
+                            <span><strong>Size Similarity</strong> &mdash; Bounding box dimension matching</span>
+                            <span>20%</span>
+                        </div>
+                        <div class="weight-bar-bg">
+                            <div class="weight-bar-fill purple" style="width: 20%;">20%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="highlight-box animate-in delay-1">
+                    <h4>Occlusion Handling</h4>
+                    <p>512-dimensional CLIP embeddings extracted every 5 frames. We maintain <strong>5 best embeddings per track</strong> for robust re-identification. Shadow tracks persist for <strong>30 frames</strong> without detection. Hungarian algorithm assigns with <strong>0.6 threshold</strong>.</p>
+                </div>
+            </div>
+
+            <div class="page-number">6</div>
+        </div>
+
+        <!-- Slide 7: Quality Filtering -->
+        <div class="slide content-slide" data-slide="7">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Crop Quality Filtering</h2>
+
+            <div class="content">
+                <div class="three-column animate-in">
+                    <div class="feature-box">
+                        <div class="icon">&#128269;</div>
+                        <h4>Blur Detection</h4>
+                        <p>Laplacian variance &gt; 50<br/>Catches motion blur &amp; out-of-focus</p>
+                    </div>
+                    <div class="feature-box">
+                        <div class="icon">&#9728;</div>
+                        <h4>Brightness</h4>
+                        <p>Mean pixel: 20-245<br/>Rejects black frames &amp; overexposed</p>
+                    </div>
+                    <div class="feature-box">
+                        <div class="icon">&#128200;</div>
+                        <h4>Contrast</h4>
+                        <p>Std deviation &gt; 15<br/>Ensures distinguishable features</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box animate-in delay-1" style="margin-top: 2rem;">
+                    <h4>Full-Body Validation (Critical)</h4>
+                    <p>We run <strong>YOLOv8n-pose</strong> and check that at least <strong>2 of 6 lower-body keypoints</strong> (hips, knees, ankles) are visible with confidence &gt; 0.5. Partial-body crops create <strong>inconsistent captions</strong> &mdash; one crop might describe full clothing, another just the torso.</p>
+                </div>
+
+                <table class="styled-table animate-in delay-2" style="margin-top: 1.5rem;">
+                    <thead>
+                        <tr>
+                            <th>Filter</th>
+                            <th>Threshold</th>
+                            <th>Purpose</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Minimum Size</td>
+                            <td>50px width &amp; height</td>
+                            <td>Ensure sufficient detail</td>
+                        </tr>
+                        <tr>
+                            <td>Blur Variance</td>
+                            <td>&gt; 50</td>
+                            <td>Reject blurry images</td>
+                        </tr>
+                        <tr>
+                            <td>Brightness Range</td>
+                            <td>20 - 245</td>
+                            <td>Proper exposure</td>
+                        </tr>
+                        <tr>
+                            <td>Lower Body Keypoints</td>
+                            <td>&ge; 2 visible</td>
+                            <td>Full-body verification</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="page-number">7</div>
+        </div>
+
+        <!-- Slide 8: Section - Stage 1.5 -->
+        <div class="slide section-slide" data-slide="8">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+
+            <span class="section-number">1.5</span>
+            <h2>Pose-Based Deduplication</h2>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Slide 9: Deduplication Strategy -->
+        <div class="slide content-slide" data-slide="9">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Why Pose-Based Deduplication?</h2>
+
+            <div class="content">
+                <div class="flow-diagram animate-in" style="margin-bottom: 2rem;">
+                    <div class="flow-box" style="min-width: 140px;">
+                        <h4>100+</h4>
+                        <p>Crops per track</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="border-color: var(--htx-cyan); min-width: 200px;">
+                        <h4>K-Means</h4>
+                        <p>34-dim pose vectors</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="min-width: 140px; background: linear-gradient(135deg, #fff 0%, #e8f5e9 100%); border-color: #22c55e;">
+                        <h4>5</h4>
+                        <p>Diverse crops</p>
+                    </div>
+                </div>
+
+                <div class="two-column animate-in delay-1">
+                    <div class="stage-card">
+                        <h3>Three Key Advantages</h3>
+                        <ul class="bullet-list">
+                            <li><strong>Zero additional inference cost</strong> &mdash; Keypoints already computed during full-body filtering</li>
+                            <li><strong>Semantic meaning</strong> &mdash; Different poses correlate with different camera angles</li>
+                            <li><strong>Robustness</strong> &mdash; Pose features invariant to minor appearance changes</li>
+                        </ul>
+                    </div>
+
+                    <div class="stage-card cyan-border">
+                        <h3>Algorithm</h3>
+                        <ul class="bullet-list cyan">
+                            <li>17 COCO keypoints &times; 2 coords = <strong>34-dim feature vector</strong></li>
+                            <li>K-Means with k = target crop count (default 5)</li>
+                            <li>Select <strong>highest quality score</strong> from each cluster</li>
+                            <li>Result: 5 crops with diverse viewing angles</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">9</div>
+        </div>
+
+        <!-- Slide 10: Quality Score -->
+        <div class="slide content-slide" data-slide="10">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Quality Score Calculation</h2>
+
+            <div class="content">
+                <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">The quality score determines which crop gets selected from each pose cluster:</p>
+
+                <div class="weight-bars animate-in">
+                    <div class="weight-item">
+                        <div class="weight-label">
+                            <span><strong>Sharpness</strong> &mdash; Normalized Laplacian variance (capped at 1.0 for variance &ge; 500)</span>
+                            <span>50%</span>
+                        </div>
+                        <div class="weight-bar-bg">
+                            <div class="weight-bar-fill purple" style="width: 50%;">50%</div>
+                        </div>
+                    </div>
+                    <div class="weight-item">
+                        <div class="weight-label">
+                            <span><strong>Edge Penalty</strong> &mdash; 15% per edge cut at frame boundary (max 60%)</span>
+                            <span>30%</span>
+                        </div>
+                        <div class="weight-bar-bg">
+                            <div class="weight-bar-fill cyan" style="width: 30%;">30%</div>
+                        </div>
+                    </div>
+                    <div class="weight-item">
+                        <div class="weight-label">
+                            <span><strong>Aspect Ratio</strong> &mdash; Ideal range 0.3-0.7 (typical standing person proportions)</span>
+                            <span>20%</span>
+                        </div>
+                        <div class="weight-bar-bg">
+                            <div class="weight-bar-fill purple" style="width: 20%;">20%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="code-block animate-in delay-1" style="margin-top: 2rem;">
+                    <span class="comment"># Quality score formula</span><br>
+                    <span class="keyword">quality_score</span> = (<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;sharpness_score * <span class="number">0.5</span> +<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;(<span class="number">1.0</span> - edge_penalty) * <span class="number">0.3</span> +<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;aspect_score * <span class="number">0.2</span><br>
+                    )
+                </div>
+            </div>
+
+            <div class="page-number">10</div>
+        </div>
+
+        <!-- Slide 11: Section - Stage 2 -->
+        <div class="slide section-slide" data-slide="11">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+
+            <span class="section-number">2</span>
+            <h2>Caption Generation</h2>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Slide 12: GPU Memory Management -->
+        <div class="slide content-slide" data-slide="12">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>GPU Memory Management</h2>
+
+            <div class="content">
+                <div class="highlight-box animate-in" style="background: linear-gradient(135deg, rgba(239,68,68,0.1) 0%, rgba(239,68,68,0.05) 100%); border-color: #ef4444;">
+                    <h4 style="color: #dc2626;">The Constraint: 48GB L40S</h4>
+                    <p>Full stack requires ~58GB VRAM: DeepStream (12GB) + Qwen3-VL-8B (26GB) + Ministral-8B (20GB). We can't run everything simultaneously.</p>
+                </div>
+
+                <div class="flow-diagram animate-in delay-1" style="margin: 2rem 0;">
+                    <div class="flow-box" style="background: linear-gradient(135deg, #fff 0%, #e0f2fe 100%);">
+                        <h4>Stage 1: Tracking</h4>
+                        <p>~12GB VRAM</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="background: #f0f0f0; border-style: dashed;">
+                        <h4>Save to Disk</h4>
+                        <p>crops/*.jpg</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="background: linear-gradient(135deg, #fff 0%, #fef3c7 100%); border-color: var(--htx-gold);">
+                        <h4>Release GPU</h4>
+                        <p>Free memory</p>
+                    </div>
+                    <span class="flow-arrow">&#8594;</span>
+                    <div class="flow-box" style="background: linear-gradient(135deg, #fff 0%, #f3e8ff 100%);">
+                        <h4>Stage 2: Caption</h4>
+                        <p>~26GB VRAM</p>
+                    </div>
+                </div>
+
+                <div class="code-block animate-in delay-2">
+                    <span class="comment"># Two-stage execution mode</span><br>
+                    python -m orchestrator.main run video.mp4 <span class="keyword">--stage</span> <span class="string">tracking</span><br>
+                    <span class="comment"># ... tracking completes, GPU freed ...</span><br>
+                    python -m orchestrator.main run video.mp4 <span class="keyword">--stage</span> <span class="string">captioning</span>
+                </div>
+            </div>
+
+            <div class="page-number">12</div>
+        </div>
+
+        <!-- Slide 13: Caption Generation Flow -->
+        <div class="slide content-slide" data-slide="13">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Captioning with Qwen3-VL-8B</h2>
+
+            <div class="content">
+                <div class="two-column animate-in">
+                    <div class="validation-box">
+                        <h4>&#128269; Guided Mode</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">When prior attributes exist from earlier crops of the same identity:</p>
+                        <ul class="bullet-list" style="font-size: 0.9rem;">
+                            <li>Verify if person matches prior attributes</li>
+                            <li>Describe accordingly if confidence &ge; 0.6</li>
+                            <li>Maintains consistency across tracking sequence</li>
+                        </ul>
+                    </div>
+
+                    <div class="validation-box secondary">
+                        <h4>&#128196; Fallback Mode</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 1rem;">No prior knowledge available:</p>
+                        <ul class="bullet-list cyan" style="font-size: 0.9rem;">
+                            <li>Describe most prominent person</li>
+                            <li>Head-to-toe ordering</li>
+                            <li>Forensic-style detail</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="stage-card animate-in delay-1" style="margin-top: 1.5rem;">
+                    <h3>Head-to-Toe Caption Ordering</h3>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem;">
+                        <span class="metric-badge">1. Demographics</span>
+                        <span class="metric-badge cyan">2. Physical Features</span>
+                        <span class="metric-badge">3. Face Details</span>
+                        <span class="metric-badge cyan">4. Upper Body</span>
+                        <span class="metric-badge">5. Lower Body</span>
+                        <span class="metric-badge cyan">6. Footwear</span>
+                        <span class="metric-badge">7. Accessories</span>
+                        <span class="metric-badge cyan">8. Action</span>
+                        <span class="metric-badge">9. Carried Items</span>
+                        <span class="metric-badge cyan">10. Context</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">13</div>
+        </div>
+
+        <!-- Slide 14: Example Caption -->
+        <div class="slide content-slide" data-slide="14">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Example Caption Output</h2>
+
+            <div class="content">
+                <div class="highlight-box animate-in" style="background: linear-gradient(135deg, rgba(0,188,212,0.05) 0%, rgba(91,45,140,0.05) 100%);">
+                    <h4>Generated Caption</h4>
+                    <p style="font-style: italic; line-height: 1.8; font-size: 1.05rem;">"Middle-aged Asian male walking at a bus stop, wearing a <strong style="color: var(--htx-cyan);">blue Adidas cap with white stripes</strong>, black-framed rectangular glasses, long-sleeve plaid shirt in white and blue, dark navy Levis jeans, white Nike Air Force 1 sneakers with red swoosh, carrying a <strong style="color: var(--htx-cyan);">black Samsonite backpack</strong> on both shoulders, right hand holding a red plastic shopping bag, looking forward while walking on concrete sidewalk next to a metal bench."</p>
+                </div>
+
+                <div class="two-column animate-in delay-1" style="margin-top: 1.5rem;">
+                    <div>
+                        <h3 style="color: var(--htx-purple); margin-bottom: 1rem;">30+ Structured Attributes</h3>
+                        <table class="styled-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Attributes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Demographics</td>
+                                    <td>gender, age_group, ethnicity</td>
+                                </tr>
+                                <tr>
+                                    <td>Upper Body</td>
+                                    <td>type, colors[], pattern, sleeve, brand</td>
+                                </tr>
+                                <tr>
+                                    <td>Lower Body</td>
+                                    <td>type, color, pattern</td>
+                                </tr>
+                                <tr>
+                                    <td>Accessories</td>
+                                    <td>bag_type, headwear, glasses, mask</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="stage-card cyan-border">
+                        <h3>Specificity Matters</h3>
+                        <ul class="bullet-list cyan">
+                            <li><strong>"Blue Adidas cap with white stripes"</strong> not just "blue cap"</li>
+                            <li>Brands only when <strong>clearly visible</strong></li>
+                            <li>Colors as precise as possible</li>
+                            <li>Patterns: solid, striped, plaid, floral</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">14</div>
+        </div>
+
+        <!-- Slide 15: Section - Stage 3 -->
+        <div class="slide section-slide" data-slide="15">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+
+            <span class="section-number">3</span>
+            <h2>Dual-Layer Validation</h2>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Slide 16: Validation Architecture -->
+        <div class="slide content-slide" data-slide="16">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Validation Architecture</h2>
+
+            <div class="content">
+                <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Generated captions can hallucinate. We validate through <strong>two parallel mechanisms</strong>:</p>
+
+                <div class="validation-flow animate-in">
+                    <div class="validation-box" style="flex: 1.2;">
+                        <h4>&#129504; Semantic Validation <span class="weight-badge">70%</span></h4>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.8rem;"><strong>Ministral-8B-Instruct</strong> acts as judge</p>
+                        <ul class="bullet-list" style="font-size: 0.85rem;">
+                            <li><strong>Accuracy:</strong> Does description match visible content?</li>
+                            <li><strong>Completeness:</strong> Are key features mentioned?</li>
+                            <li><strong>Consistency:</strong> Any internal contradictions?</li>
+                            <li><strong>Hallucination:</strong> Mentions items not visible?</li>
+                        </ul>
+                    </div>
+
+                    <div class="validation-box secondary">
+                        <h4>&#128064; Visual Grounding <span class="weight-badge">30%</span></h4>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.8rem;"><strong>SAM3</strong> verifies objects exist</p>
+                        <ul class="bullet-list cyan" style="font-size: 0.85rem;">
+                            <li>Extract critical nouns from caption</li>
+                            <li>Query SAM to find each object</li>
+                            <li>Calculate verification pass rate</li>
+                            <li>Threshold: 80% for pass</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="code-block animate-in delay-1" style="margin-top: 1rem;">
+                    <span class="comment"># Combined validation score</span><br>
+                    <span class="keyword">overall_score</span> = (semantic.score * <span class="number">0.7</span>) + (grounding.pass_rate * <span class="number">100</span> * <span class="number">0.3</span>)
+                </div>
+            </div>
+
+            <div class="page-number">16</div>
+        </div>
+
+        <!-- Slide 17: Critical Nouns -->
+        <div class="slide content-slide" data-slide="17">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Critical Nouns for Visual Grounding</h2>
+
+            <div class="content">
+                <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Visual grounding focuses on <strong>discrete, falsifiable objects</strong>:</p>
+
+                <div class="three-column animate-in">
+                    <div class="feature-box">
+                        <div class="icon">&#127890;</div>
+                        <h4>Bags</h4>
+                        <p style="font-size: 0.85rem;">backpack, handbag, tote, briefcase, shopping bag, duffel, sling, messenger</p>
+                    </div>
+                    <div class="feature-box">
+                        <div class="icon">&#129506;</div>
+                        <h4>Headwear</h4>
+                        <p style="font-size: 0.85rem;">cap, hat, helmet, beanie, headscarf, bandana, hood, visor</p>
+                    </div>
+                    <div class="feature-box">
+                        <div class="icon">&#128083;</div>
+                        <h4>Accessories</h4>
+                        <p style="font-size: 0.85rem;">glasses, sunglasses, mask, earrings, watch, necklace</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box animate-in delay-1" style="margin-top: 1.5rem;">
+                    <h4>Hallucination Detection</h4>
+                    <p>If caption says <strong>"carrying a black backpack"</strong> and SAM can't find a backpack in the image, that's a hallucination. Pass rate threshold is <strong>80%</strong>. Below <strong>50%</strong> fails the crop entirely.</p>
+                </div>
+
+                <div class="stats-grid animate-in delay-2" style="margin-top: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="number" style="font-size: 2rem;">&ge;80%</div>
+                        <div class="label">Pass Rate to Pass</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" style="font-size: 2rem;">50-79%</div>
+                        <div class="label">Partial (Review)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" style="font-size: 2rem; color: #ef4444;">&lt;50%</div>
+                        <div class="label">Fail (Reject)</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" style="font-size: 2rem; color: var(--htx-cyan);">30%</div>
+                        <div class="label">Weight in Final Score</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">17</div>
+        </div>
+
+        <!-- Slide 18: Validation Thresholds -->
+        <div class="slide content-slide" data-slide="18">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Validation Thresholds & Actions</h2>
+
+            <div class="content">
+                <div class="threshold-scale animate-in">
+                    <h3 style="color: var(--htx-purple); margin-bottom: 1rem; text-align: center;">Combined Validation Score (0-100)</h3>
+                    <div class="scale-bar">
+                        <span class="scale-marker" style="left: 0%;">0</span>
+                        <span class="scale-marker" style="left: 60%;">60</span>
+                        <span class="scale-marker" style="left: 85%;">85</span>
+                        <span class="scale-marker" style="left: 100%;">100</span>
+
+                        <span class="scale-label" style="left: 30%;">&#10060; REJECTED</span>
+                        <span class="scale-label" style="left: 72%;">&#128270; NEEDS REVIEW</span>
+                        <span class="scale-label" style="left: 92%;">&#9989; AUTO-APPROVED</span>
+                    </div>
+                </div>
+
+                <div class="three-column animate-in delay-1" style="margin-top: 3rem;">
+                    <div class="feature-box" style="border-top: 4px solid #22c55e;">
+                        <div class="icon">&#9989;</div>
+                        <h4 style="color: #22c55e;">Score &ge; 85</h4>
+                        <p><strong>Auto-approved</strong><br/>No human review needed<br/>Goes directly to dataset</p>
+                    </div>
+                    <div class="feature-box" style="border-top: 4px solid #f97316;">
+                        <div class="icon">&#128270;</div>
+                        <h4 style="color: #f97316;">Score 60-84</h4>
+                        <p><strong>Needs review</strong><br/>Exported to Label Studio<br/>Human verification required</p>
+                    </div>
+                    <div class="feature-box" style="border-top: 4px solid #ef4444;">
+                        <div class="icon">&#10060;</div>
+                        <h4 style="color: #ef4444;">Score &lt; 60</h4>
+                        <p><strong>Rejected</strong><br/>Not included in dataset<br/>Too many issues detected</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">18</div>
+        </div>
+
+        <!-- Slide 19: Tracker Comparison -->
+        <div class="slide content-slide" data-slide="19">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Tracker Backend Comparison</h2>
+
+            <div class="content">
+                <table class="styled-table animate-in">
+                    <thead>
+                        <tr>
+                            <th>Tracker</th>
+                            <th>Speed</th>
+                            <th>Memory</th>
+                            <th>Best For</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong style="color: var(--htx-purple);">DeepStream</strong></td>
+                            <td>500+ FPS</td>
+                            <td>~12GB</td>
+                            <td>High-throughput batch processing</td>
+                        </tr>
+                        <tr>
+                            <td><strong style="color: var(--htx-cyan);">BoxMOT</strong></td>
+                            <td>~100 FPS</td>
+                            <td>~4GB</td>
+                            <td>Memory-constrained environments</td>
+                        </tr>
+                        <tr>
+                            <td><strong style="color: var(--htx-purple);">SAM3</strong></td>
+                            <td>~30 FPS</td>
+                            <td>~10GB</td>
+                            <td>When segmentation masks needed</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="highlight-box animate-in delay-1" style="margin-top: 2rem;">
+                    <h4>Plug-and-Play Architecture</h4>
+                    <p>All three tracker backends produce <strong>identical output formats</strong>. The orchestrator abstracts the backend choice &mdash; same API, same output schema, plug-and-play backends. Choose based on your constraints.</p>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 1.5rem;" class="animate-in delay-2">
+                    <span class="metric-badge">TensorRT Optimized</span>
+                    <span class="metric-badge cyan">CLIP-ReID Embeddings</span>
+                    <span class="metric-badge">GPU-Accelerated DCF</span>
+                    <span class="metric-badge cyan">Hungarian Assignment</span>
+                </div>
+            </div>
+
+            <div class="page-number">19</div>
+        </div>
+
+        <!-- Slide 20: Performance -->
+        <div class="slide content-slide" data-slide="20">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Performance Characteristics</h2>
+
+            <div class="content">
+                <div class="stats-grid animate-in">
+                    <div class="stat-card">
+                        <div class="number">500+</div>
+                        <div class="label">FPS Detection</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" style="color: var(--htx-cyan);">ms</div>
+                        <div class="label">Deduplication</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number">2-3s</div>
+                        <div class="label">Per Crop Caption</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="number" style="color: var(--htx-cyan);">~1s</div>
+                        <div class="label">Per Crop Validation</div>
+                    </div>
+                </div>
+
+                <div class="highlight-box animate-in delay-1" style="margin-top: 2rem; background: linear-gradient(135deg, rgba(34,197,94,0.1) 0%, rgba(34,197,94,0.05) 100%); border-color: #22c55e;">
+                    <h4 style="color: #22c55e;">End-to-End Example</h4>
+                    <p style="font-size: 1.1rem;">A <strong>60-second video</strong> with <strong>15 tracked individuals</strong> produces <strong>75 annotated crops</strong> in under <strong>5 minutes</strong>.</p>
+                </div>
+
+                <div class="two-column animate-in delay-2" style="margin-top: 1.5rem;">
+                    <div class="stage-card">
+                        <h3>Batch Parallelism</h3>
+                        <ul class="bullet-list">
+                            <li>Caption batch: <strong>4 concurrent</strong></li>
+                            <li>Validation: <strong>parallel with captioning</strong></li>
+                            <li>Every frame processed</li>
+                        </ul>
+                    </div>
+                    <div class="stage-card cyan-border">
+                        <h3>Memory Profile (L40S 48GB)</h3>
+                        <ul class="bullet-list cyan">
+                            <li>DeepStream: ~12GB</li>
+                            <li>Qwen3-VL-8B: ~26GB</li>
+                            <li>Ministral-8B: ~20GB</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">20</div>
+        </div>
+
+        <!-- Slide 21: Key Design Decisions -->
+        <div class="slide content-slide" data-slide="21">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Key Design Decisions</h2>
+
+            <div class="content">
+                <div class="summary-grid animate-in">
+                    <div class="summary-item">
+                        <div class="summary-icon">1</div>
+                        <div class="summary-text">
+                            <h4>Process Every Frame</h4>
+                            <p>Don't skip frames. Let deduplication handle redundancy intelligently.</p>
+                        </div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-icon">2</div>
+                        <div class="summary-text">
+                            <h4>Pose-Based Deduplication</h4>
+                            <p>More semantically meaningful than pixel similarity, zero additional cost.</p>
+                        </div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-icon">3</div>
+                        <div class="summary-text">
+                            <h4>Two-Stage GPU Execution</h4>
+                            <p>Practical solution for memory constraints on single GPU.</p>
+                        </div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-icon">4</div>
+                        <div class="summary-text">
+                            <h4>Guided Captioning</h4>
+                            <p>Maintain consistency across crops of same identity.</p>
+                        </div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-icon">5</div>
+                        <div class="summary-text">
+                            <h4>Dual-Layer Validation</h4>
+                            <p>Semantic judgment + visual grounding catches different failure modes.</p>
+                        </div>
+                    </div>
+                    <div class="summary-item">
+                        <div class="summary-icon">6</div>
+                        <div class="summary-text">
+                            <h4>Quality-First Selection</h4>
+                            <p>From each pose cluster, always pick the sharpest crop.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="page-number">21</div>
+        </div>
+
+        <!-- Slide 22: Summary -->
+        <div class="slide title-slide" data-slide="22">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+            </svg>
+
+            <h1 style="font-size: 3rem;">Summary</h1>
+
+            <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 2rem; max-width: 1000px;">
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem 1.5rem; border-radius: 10px; backdrop-filter: blur(5px);">
+                    <div style="color: var(--htx-light-cyan); font-size: 2rem; font-weight: bold;">500+ FPS</div>
+                    <div style="color: white; font-size: 0.9rem;">DeepStream Processing</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem 1.5rem; border-radius: 10px; backdrop-filter: blur(5px);">
+                    <div style="color: var(--htx-light-cyan); font-size: 2rem; font-weight: bold;">5 Crops</div>
+                    <div style="color: white; font-size: 0.9rem;">Per Identity (Pose K-Means)</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem 1.5rem; border-radius: 10px; backdrop-filter: blur(5px);">
+                    <div style="color: var(--htx-light-cyan); font-size: 2rem; font-weight: bold;">30+</div>
+                    <div style="color: white; font-size: 0.9rem;">Structured Attributes</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.1); padding: 1rem 1.5rem; border-radius: 10px; backdrop-filter: blur(5px);">
+                    <div style="color: var(--htx-light-cyan); font-size: 2rem; font-weight: bold;">Dual</div>
+                    <div style="color: white; font-size: 0.9rem;">Layer Validation</div>
+                </div>
+            </div>
+
+            <p class="subtitle" style="margin-top: 3rem; max-width: 800px;">What would take weeks of manual annotation now takes minutes,<br/>with quality rivaling human annotators on high-confidence predictions.</p>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Slide 23: Q&A -->
+        <div class="slide title-slide" data-slide="23">
+            <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+                <path d="M0 160 L90 160 L120 130 L190 130" fill="none" stroke-width="2"/>
+            </svg>
+            <svg class="circuit-pattern bottom-right dark-circuit" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
+                <path d="M0 160 L90 160 L120 130 L190 130" fill="none" stroke-width="2"/>
+            </svg>
+
+            <h1 style="font-size: 4.5rem;">Q&A</h1>
+            <h2 style="font-weight: 300; letter-spacing: 2px;">Questions & Discussion</h2>
+
+            <p class="subtitle" style="margin-top: 2rem;">Deep dive available on:<br/>Detection configuration | Deduplication algorithm | Prompt engineering | Validation thresholds</p>
+
+            <div class="htx-logo">
+                <svg viewBox="0 0 100 80">
+                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
+                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
+                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
+                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
+                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="nav-controls">
+        <button class="nav-btn" id="prevBtn" onclick="prevSlide()">&#8592; Previous</button>
+        <span class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides">23</span></span>
+        <button class="nav-btn" id="nextBtn" onclick="nextSlide()">Next &#8594;</button>
+    </div>
+
+    <script>
+        let currentSlide = 1;
+        const totalSlides = 23;
+
+        function showSlide(n) {
+            const slides = document.querySelectorAll('.slide');
+
+            if (n > totalSlides) currentSlide = 1;
+            if (n < 1) currentSlide = totalSlides;
+
+            slides.forEach(slide => {
+                slide.classList.remove('active');
+            });
+
+            slides[currentSlide - 1].classList.add('active');
+
+            // Update counter
+            document.getElementById('currentSlide').textContent = currentSlide;
+
+            // Update progress bar
+            const progress = (currentSlide / totalSlides) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+
+            // Update button states
+            document.getElementById('prevBtn').disabled = currentSlide === 1;
+            document.getElementById('nextBtn').disabled = currentSlide === totalSlides;
+
+            // Trigger animations for visible slide
+            const activeSlide = slides[currentSlide - 1];
+            const animatedElements = activeSlide.querySelectorAll('.animate-in');
+            animatedElements.forEach(el => {
+                el.style.animation = 'none';
+                el.offsetHeight; // Trigger reflow
+                el.style.animation = null;
+            });
+        }
+
+        function nextSlide() {
+            currentSlide++;
+            showSlide(currentSlide);
+        }
+
+        function prevSlide() {
+            currentSlide--;
+            showSlide(currentSlide);
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                nextSlide();
+            } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+                e.preventDefault();
+                prevSlide();
+            } else if (e.key === 'Home') {
+                e.preventDefault();
+                currentSlide = 1;
+                showSlide(currentSlide);
+            } else if (e.key === 'End') {
+                e.preventDefault();
+                currentSlide = totalSlides;
+                showSlide(currentSlide);
+            }
+        });
+
+        // Touch/swipe support
+        let touchStartX = 0;
+        let touchEndX = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        document.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+
+        function handleSwipe() {
+            const swipeThreshold = 50;
+            if (touchEndX < touchStartX - swipeThreshold) {
+                nextSlide();
+            }
+            if (touchEndX > touchStartX + swipeThreshold) {
+                prevSlide();
+            }
+        }
+
+        // Click to advance (optional - click on empty area)
+        document.querySelector('.slide-container').addEventListener('click', function(e) {
+            if (e.target.closest('.nav-controls') || e.target.closest('button') || e.target.closest('a')) {
+                return;
+            }
+
+            const clickX = e.clientX;
+            const windowWidth = window.innerWidth;
+
+            if (clickX > windowWidth * 0.7) {
+                nextSlide();
+            } else if (clickX < windowWidth * 0.3) {
+                prevSlide();
+            }
+        });
+
+        // Initialize
+        showSlide(currentSlide);
+    </script>
+</body>
+</html>
