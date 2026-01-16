@@ -654,6 +654,16 @@
             cursor: not-allowed;
         }
 
+        .nav-controls.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .nav-controls {
+            transition: opacity 0.3s ease;
+        }
+
         .slide-counter {
             color: white;
             display: flex;
@@ -850,20 +860,6 @@
             <h1>Automatic Data Annotation Pipeline</h1>
             <h2>DeepStream + vLLM Architecture</h2>
             <p class="subtitle">Transforming Raw Video into Curated Person Attributes Datasets</p>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <circle cx="25" cy="40" r="4" fill="#FFFFFF"/>
-                    <circle cx="75" cy="40" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
         </div>
 
         <!-- Slide 2: The Problem -->
@@ -999,18 +995,6 @@
 
             <span class="section-number">1</span>
             <h2>Detection & Tracking</h2>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
         </div>
 
         <!-- Slide 5: DeepStream Architecture -->
@@ -1146,8 +1130,8 @@
                 </div>
 
                 <div class="highlight-box animate-in delay-1" style="margin-top: 2rem;">
-                    <h4>Full-Body Validation (Critical)</h4>
-                    <p>We run <strong>YOLOv8n-pose</strong> and check that at least <strong>2 of 6 lower-body keypoints</strong> (hips, knees, ankles) are visible with confidence &gt; 0.5. Partial-body crops create <strong>inconsistent captions</strong> &mdash; one crop might describe full clothing, another just the torso.</p>
+                    <h4>Upper Body + Hip Coverage Validation (Critical)</h4>
+                    <p>We run <strong>YOLOv8n-pose</strong> and require at least <strong>2 of 6 lower-body keypoints</strong> (hips, knees, ankles) visible with confidence &gt; 0.5. This guarantees <strong>upper body and hip visibility</strong> &mdash; ensuring consistent torso coverage for captioning. Note: this does <em>not</em> guarantee full lower-body visibility (legs/feet may be cropped).</p>
                 </div>
 
                 <table class="styled-table animate-in delay-2" style="margin-top: 1.5rem;">
@@ -1177,7 +1161,7 @@
                         <tr>
                             <td>Lower Body Keypoints</td>
                             <td>&ge; 2 visible</td>
-                            <td>Full-body verification</td>
+                            <td>Upper body + hip coverage</td>
                         </tr>
                     </tbody>
                 </table>
@@ -1199,18 +1183,6 @@
 
             <span class="section-number">1.5</span>
             <h2>Pose-Based Deduplication</h2>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
         </div>
 
         <!-- Slide 9: Deduplication Strategy -->
@@ -1244,7 +1216,7 @@
                     <div class="stage-card">
                         <h3>Three Key Advantages</h3>
                         <ul class="bullet-list">
-                            <li><strong>Zero additional inference cost</strong> &mdash; Keypoints already computed during full-body filtering</li>
+                            <li><strong>Zero additional inference cost</strong> &mdash; Keypoints already computed during body coverage filtering</li>
                             <li><strong>Semantic meaning</strong> &mdash; Different poses correlate with different camera angles</li>
                             <li><strong>Robustness</strong> &mdash; Pose features invariant to minor appearance changes</li>
                         </ul>
@@ -1333,18 +1305,6 @@
 
             <span class="section-number">2</span>
             <h2>Caption Generation</h2>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
         </div>
 
         <!-- Slide 12: GPU Memory Management -->
@@ -1521,18 +1481,6 @@
 
             <span class="section-number">3</span>
             <h2>Dual-Layer Validation</h2>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
         </div>
 
         <!-- Slide 16: Validation Architecture -->
@@ -1857,8 +1805,49 @@
             <div class="page-number">21</div>
         </div>
 
-        <!-- Slide 22: Summary -->
-        <div class="slide title-slide" data-slide="22">
+        <!-- Slide 22: Current Limitations -->
+        <div class="slide content-slide" data-slide="22">
+            <svg class="circuit-pattern top-left" viewBox="0 0 300 300">
+                <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+                <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke="#5B2D8C" stroke-width="2"/>
+            </svg>
+
+            <h2>Current Limitations & Future Work</h2>
+
+            <div class="content">
+                <div class="two-column animate-in">
+                    <div class="stage-card" style="border-left-color: #f97316;">
+                        <h3 style="color: #f97316;">&#9888; Current Limitations</h3>
+                        <ul class="bullet-list" style="font-size: 0.95rem;">
+                            <li><strong>No HITL benchmarking yet</strong> &mdash; We haven't validated how often human annotators agree with system-generated captions and validation scores</li>
+                            <li><strong>Single GPU constraint</strong> &mdash; Running on 1&times; L40S requires sequential stage execution with container spin-down/spin-up latency</li>
+                            <li><strong>Same-size models</strong> &mdash; Using 8B params for both captioning VLM and validation judge; larger judge model may improve reliability</li>
+                            <li><strong>Upper body + hip only</strong> &mdash; Pose filter ensures torso coverage, not guaranteed full-body visibility</li>
+                        </ul>
+                    </div>
+
+                    <div class="stage-card cyan-border">
+                        <h3>&#128736; For Production Readiness</h3>
+                        <ul class="bullet-list cyan" style="font-size: 0.95rem;">
+                            <li><strong>Human-in-the-loop validation</strong> &mdash; Benchmark against human annotators to measure system reliability</li>
+                            <li><strong>vLLM as a service</strong> &mdash; Persistent inference service for multi-model fast switching without container restarts</li>
+                            <li><strong>Larger/smaller model pairing</strong> &mdash; Consider asymmetric model sizes for captioner vs. judge depending on reasoning needs</li>
+                            <li><strong>Active learning integration</strong> &mdash; HITL feedback could enable RL fine-tuning or other improvement loops over time</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="highlight-box animate-in delay-1" style="margin-top: 1.5rem; background: linear-gradient(135deg, rgba(249,115,22,0.1) 0%, rgba(249,115,22,0.05) 100%); border-color: #f97316;">
+                    <h4 style="color: #f97316;">Key Unknown</h4>
+                    <p>System reliability is <strong>unvalidated</strong>. We need human-in-the-loop review of generated captions and validation scores to establish: (1) How often do human annotators agree with auto-approved samples? (2) What is the false positive/negative rate of the validation thresholds? This benchmarking is critical before production deployment.</p>
+                </div>
+            </div>
+
+            <div class="page-number">22</div>
+        </div>
+
+        <!-- Slide 23: Summary -->
+        <div class="slide title-slide" data-slide="23">
             <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
                 <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
                 <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
@@ -1889,23 +1878,11 @@
                 </div>
             </div>
 
-            <p class="subtitle" style="margin-top: 3rem; max-width: 800px;">What would take weeks of manual annotation now takes minutes,<br/>with quality rivaling human annotators on high-confidence predictions.</p>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
+            <p class="subtitle" style="margin-top: 3rem; max-width: 800px;">An end-to-end pipeline for scalable person attribute annotation.<br/>Human-in-the-loop benchmarking required before production deployment.</p>
         </div>
 
-        <!-- Slide 23: Q&A -->
-        <div class="slide title-slide" data-slide="23">
+        <!-- Slide 24: Q&A -->
+        <div class="slide title-slide" data-slide="24">
             <svg class="circuit-pattern top-left dark-circuit" viewBox="0 0 300 300">
                 <path d="M0 100 L50 100 L80 70 L150 70" fill="none" stroke-width="2"/>
                 <path d="M0 130 L70 130 L100 100 L170 100" fill="none" stroke-width="2"/>
@@ -1921,31 +1898,19 @@
             <h2 style="font-weight: 300; letter-spacing: 2px;">Questions & Discussion</h2>
 
             <p class="subtitle" style="margin-top: 2rem;">Deep dive available on:<br/>Detection configuration | Deduplication algorithm | Prompt engineering | Validation thresholds</p>
-
-            <div class="htx-logo">
-                <svg viewBox="0 0 100 80">
-                    <line x1="20" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="80" y1="60" x2="50" y2="20" stroke="#00BCD4" stroke-width="3"/>
-                    <line x1="25" y1="40" x2="75" y2="40" stroke="#00BCD4" stroke-width="3"/>
-                    <circle cx="20" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="80" cy="60" r="4" fill="#FFFFFF"/>
-                    <circle cx="50" cy="20" r="4" fill="#FFFFFF"/>
-                    <text x="50" y="75" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="bold">HTX</text>
-                </svg>
-            </div>
         </div>
     </div>
 
     <!-- Navigation Controls -->
     <div class="nav-controls">
         <button class="nav-btn" id="prevBtn" onclick="prevSlide()">&#8592; Previous</button>
-        <span class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides">23</span></span>
+        <span class="slide-counter"><span id="currentSlide">1</span> / <span id="totalSlides">24</span></span>
         <button class="nav-btn" id="nextBtn" onclick="nextSlide()">Next &#8594;</button>
     </div>
 
     <script>
         let currentSlide = 1;
-        const totalSlides = 23;
+        const totalSlides = 24;
 
         function showSlide(n) {
             const slides = document.querySelectorAll('.slide');
@@ -1990,6 +1955,19 @@
             showSlide(currentSlide);
         }
 
+        // Navigation visibility toggle
+        let navVisible = true;
+
+        function toggleNavControls() {
+            const navControls = document.querySelector('.nav-controls');
+            navVisible = !navVisible;
+            if (navVisible) {
+                navControls.classList.remove('hidden');
+            } else {
+                navControls.classList.add('hidden');
+            }
+        }
+
         // Keyboard navigation
         document.addEventListener('keydown', function(e) {
             if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
@@ -2006,6 +1984,9 @@
                 e.preventDefault();
                 currentSlide = totalSlides;
                 showSlide(currentSlide);
+            } else if (e.key === 'h' || e.key === 'H') {
+                e.preventDefault();
+                toggleNavControls();
             }
         });
 
